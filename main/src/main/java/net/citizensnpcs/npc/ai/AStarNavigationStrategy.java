@@ -2,6 +2,7 @@ package net.citizensnpcs.npc.ai;
 
 import java.util.List;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Effect;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
@@ -12,12 +13,13 @@ import org.bukkit.util.Vector;
 import com.google.common.collect.Lists;
 
 import net.citizensnpcs.Settings.Setting;
+import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.AbstractPathStrategy;
 import net.citizensnpcs.api.ai.NavigatorParameters;
 import net.citizensnpcs.api.ai.TargetType;
 import net.citizensnpcs.api.ai.event.CancelReason;
 import net.citizensnpcs.api.astar.AStarMachine;
-import net.citizensnpcs.api.astar.pathfinder.ChunkBlockSource;
+import net.citizensnpcs.api.astar.pathfinder.AsyncBlockSource;
 import net.citizensnpcs.api.astar.pathfinder.MinecraftBlockExaminer;
 import net.citizensnpcs.api.astar.pathfinder.Path;
 import net.citizensnpcs.api.astar.pathfinder.VectorGoal;
@@ -30,9 +32,7 @@ public class AStarNavigationStrategy extends AbstractPathStrategy {
     private final NPC npc;
     private final NavigatorParameters params;
     private Path plan;
-    private boolean planned = false;
-    private boolean planning = true;
-    private boolean started_planning = false;
+    private boolean planned = false, started_planning = false;
     private Vector vector;
 
     public AStarNavigationStrategy(NPC npc, Iterable<Vector> path, NavigatorParameters params) {
@@ -64,7 +64,6 @@ public class AStarNavigationStrategy extends AbstractPathStrategy {
     public void setPlan(Path path) {
         this.plan = path;
         this.planned = true;
-        this.planning = false;
         if (plan == null || plan.isComplete()) {
             setCancelReason(CancelReason.STUCK);
         } else {
@@ -85,23 +84,24 @@ public class AStarNavigationStrategy extends AbstractPathStrategy {
 
     @Override
     public boolean update() {
-        if (!planned && !started_planning) {
-        	started_planning = true;
+    	if (!planned && !started_planning) {
+         	started_planning = true;
             final Location location = npc.getEntity().getLocation();
             final VectorGoal goal = new VectorGoal(destination, (float) params.pathDistanceMargin());
-            new Thread(){
+            Bukkit.getScheduler().runTaskAsynchronously(CitizensAPI.getPlugin(), new Runnable() {
+
+				@Override
+				public void run() {
+					setPlan(ASTAR.runFully(goal,
+		                    new VectorNode(goal, location, new AsyncBlockSource(location.getWorld()), params.examiners()),
+		                    Setting.MAXIMUM_ASTAR_ITERATIONS.asInt()));
+				}
             	
-            	@Override
-            	public void run(){
-                    setPlan(ASTAR.runFully(goal,
-                            new VectorNode(goal, location, new ChunkBlockSource(location, params.range()), params.examiners()),
-                            Setting.MAXIMUM_ASTAR_ITERATIONS.asInt()));
-            	}
-            }.start();
+            });
         }
-        if(planning){
-        	return false;
-        }
+    	if (started_planning && !planned) {
+    		return false;
+    	}
         if (getCancelReason() != null || plan == null || plan.isComplete()) {
             return true;
         }
@@ -116,10 +116,6 @@ public class AStarNavigationStrategy extends AbstractPathStrategy {
         double dX = vector.getBlockX() - currLoc.getX();
         double dZ = vector.getBlockZ() - currLoc.getZ();
         double dY = vector.getY() - currLoc.getY();
-        
-        Block block = currLoc.getWorld().getBlockAt(vector.getBlockX(), vector.getBlockY(), vector.getBlockZ());
-        MinecraftBlockExaminer.fixHalfBlocks(block, vector);
-        
         double xzDistance = dX * dX + dZ * dZ;
         double distance = xzDistance + dY * dY;
         if (params.debug()) {
@@ -130,7 +126,7 @@ public class AStarNavigationStrategy extends AbstractPathStrategy {
             NMS.setShouldJump(npc.getEntity());
         }
         double destX = vector.getX() + 0.5, destZ = vector.getZ() + 0.5;
-
+        Block block = currLoc.getWorld().getBlockAt(vector.getBlockX(), vector.getBlockY(), vector.getBlockZ());
         if (MinecraftBlockExaminer.isDoor(block.getType())) {
             Door door = (Door) block.getState().getData();
             if (door.isOpen()) {
@@ -139,7 +135,6 @@ public class AStarNavigationStrategy extends AbstractPathStrategy {
                 destZ = vector.getZ() + targetFace.getModZ();
             }
         }
-        
         NMS.setDestination(npc.getEntity(), destX, vector.getY(), destZ, params.speed());
         params.run();
         plan.run(npc);
