@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /bin
 target
 .classpath
@@ -9,3 +10,20 @@ Citizens.jar
 *.iml
 /.idea
 dependency-reduced-pom.xml
+=======
+# Project files
+.settings/
+.idea/
+.classpath
+.project
+*.iml
+
+# Build files
+target/
+bin/
+*.jar
+*.jardesc
+*.lnk
+
+
+>>>>>>> upstream/master
