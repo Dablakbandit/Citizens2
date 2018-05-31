@@ -2,7 +2,6 @@ package net.citizensnpcs.npc.ai;
 
 import java.util.List;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Effect;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
@@ -13,7 +12,6 @@ import org.bukkit.util.Vector;
 import com.google.common.collect.Lists;
 
 import net.citizensnpcs.Settings.Setting;
-import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.AbstractPathStrategy;
 import net.citizensnpcs.api.ai.NavigatorParameters;
 import net.citizensnpcs.api.ai.TargetType;
@@ -25,6 +23,7 @@ import net.citizensnpcs.api.astar.pathfinder.Path;
 import net.citizensnpcs.api.astar.pathfinder.VectorGoal;
 import net.citizensnpcs.api.astar.pathfinder.VectorNode;
 import net.citizensnpcs.api.npc.NPC;
+import net.citizensnpcs.api.util.async.AsyncExecutor;
 import net.citizensnpcs.util.NMS;
 
 public class AStarNavigationStrategy extends AbstractPathStrategy {
@@ -88,7 +87,7 @@ public class AStarNavigationStrategy extends AbstractPathStrategy {
          	started_planning = true;
             final Location location = npc.getEntity().getLocation();
             final VectorGoal goal = new VectorGoal(destination, (float) params.pathDistanceMargin());
-            Bukkit.getScheduler().runTaskAsynchronously(CitizensAPI.getPlugin(), new Runnable() {
+            AsyncExecutor.schedule(new Runnable() {
 
 				@Override
 				public void run() {
